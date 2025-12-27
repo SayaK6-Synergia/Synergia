@@ -1,0 +1,137 @@
+pcall(function()
+
+--==================== SERVICES & PLAYER VARS ====================
+
+local Players  = game:GetService("Players")
+local player   = Players.LocalPlayer
+
+local plrVars  = player:WaitForChild("PlrVars")
+local stamina  = plrVars:WaitForChild("Stamina")
+local synergy  = plrVars:WaitForChild("Synergy")
+local passes   = plrVars:WaitForChild("Passes")
+
+-- Estados Extras
+local keepStamina     = false
+local keepSynergy     = false
+local activatePasses  = false
+
+--==================== EXTRAS LOGIC ====================
+
+local function startInfiniteStamina()
+    task.spawn(function()
+        while keepStamina do
+            if stamina and stamina.Value < 200 then
+                stamina.Value = 200
+            end
+            task.wait(0.1)
+        end
+    end)
+end
+
+local function startInfiniteSynergy()
+    task.spawn(function()
+        while keepSynergy do
+            if synergy and synergy.Value < 300 then
+                synergy.Value = 300
+            end
+            task.wait(0.1)
+        end
+    end)
+end
+
+local function activateAllPasses()
+    if not passes then return end
+    for _, v in pairs(passes:GetChildren()) do
+        if v:IsA("BoolValue") then
+            v.Value = true
+        elseif v:IsA("IntValue") or v:IsA("NumberValue") then
+            v.Value = 1
+        end
+    end
+end
+
+--==================== UI FATALITY SYNERGIA (SOLO EXTRAS) ====================
+
+local Fatality = loadstring(game:HttpGet("https://raw.githubusercontent.com/4lpaca-pin/Fatality/refs/heads/main/src/source.luau"))()
+local Notification = Fatality:CreateNotifier()
+
+Fatality:Loader({
+    Name = "Synergia - Extras",
+    Duration = 3
+})
+
+local Window = Fatality.new({
+    Name = "Synergia - Extras",
+    Expire = "never",
+})
+
+-- ÚNICA TAB: EXTRAS
+local ExtrasMenu = Window:AddMenu({
+    Name = "EXTRAS",
+    Icon = "settings"
+})
+
+do
+    local ExtrasSection = ExtrasMenu:AddSection({
+        Position = "left",
+        Name = "STATS"
+    })
+
+    ExtrasSection:AddToggle({
+        Name = "INF STAMINA",
+        Default = false,
+        Callback = function(val)
+            keepStamina = val
+            if keepStamina then
+                startInfiniteStamina()
+            end
+            Notification:Notify({
+                Title = "Infinite Stamina",
+                Content = val and "Stamina locked at 200." or "Stamina restored.",
+                Duration = 3,
+                Icon = "activity"
+            })
+        end
+    })
+
+    ExtrasSection:AddToggle({
+        Name = "INF SYNERGY",
+        Default = false,
+        Callback = function(val)
+            keepSynergy = val
+            if keepSynergy then
+                startInfiniteSynergy()
+            end
+            Notification:Notify({
+                Title = "Infinite Synergy",
+                Content = val and "Synergy locked at 300." or "Synergy restored.",
+                Duration = 3,
+                Icon = "activity"
+            })
+        end
+    })
+
+    local PassSection = ExtrasMenu:AddSection({
+        Position = "right",
+        Name = "GAMEPASSES"
+    })
+
+    PassSection:AddToggle({
+        Name = "All gamepasses (free)",
+        Default = false,
+        Callback = function(val)
+            activatePasses = val
+            if activatePasses then
+                activateAllPasses()
+            end
+            Notification:Notify({
+                Title = "Gamepasses",
+                Content = val and "All passes set to owned." or "No change (values persist).",
+                Duration = 3,
+                Icon = "star"
+            })
+        end
+    })
+end
+
+end)
