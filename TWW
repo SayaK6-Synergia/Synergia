@@ -1,0 +1,464 @@
+pcall(function()
+
+--==================== SERVICES ====================
+
+local Players    = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Lighting   = game:GetService("Lighting")
+local player     = Players.LocalPlayer
+
+--==================== WILD WEST ESP FLAGS ====================
+
+local espVegetalEnabled  = false
+local espAnimalEnabled   = false
+local espPlayersEnabled  = false
+local espLootBagEnabled  = false
+
+--==================== WILD WEST ESP CORE ====================
+
+local regionTreePaths = {
+    "REGION_Swamp","REGION_Silverhills","REGION_RaiderCanyons","REGION_Plantation",
+    "REGION_Plains","REGION_Mountains","REGION_Highlands","REGION_ForestOfBones",
+    "REGION_Forest","REGION_Desert","REGION_BearpawValley"
+}
+
+local vegetationPaths = {
+    {"REGION_RaiderCanyons", "Vegetation"},
+    {"REGION_Desert", "Vegetation"}
+}
+
+local function getFolder(region, subfolder)
+    local geo = workspace:FindFirstChild("WORKSPACE_Geometry")
+    if geo then
+        local reg = geo:FindFirstChild(region)
+        if reg then return reg:FindFirstChild(subfolder) end
+    end
+    return nil
+end
+
+local function getTreeFolder(region)
+    return getFolder(region, "Trees")
+end
+
+local function getHealth(model)
+    local info = model:FindFirstChild("TreeInfo")
+    if info then
+        local healthValue = info:FindFirstChild("Health")
+        if healthValue and healthValue:IsA("NumberValue") then
+            return healthValue.Value
+        end
+    end
+    return 0
+end
+
+local function hasAnyAttachment(model)
+    for _, desc in ipairs(model:GetDescendants()) do
+        if desc:IsA("Attachment") then
+            return true
+        end
+    end
+    return false
+end
+
+local function setHighlight(model, active, color)
+    if not model then return end
+    local hl = model:FindFirstChild("ESP_Highlight")
+    if active then
+        if not hl then
+            hl = Instance.new("Highlight")
+            hl.Name = "ESP_Highlight"
+            hl.Adornee = model
+            hl.FillColor = color
+            hl.FillTransparency = 0.3
+            hl.OutlineColor = color
+            hl.OutlineTransparency = 0
+            hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+            hl.Parent = model
+        else
+            hl.FillColor = color
+            hl.OutlineColor = color
+            hl.FillTransparency = 0.3
+            hl.OutlineTransparency = 0
+            hl.Enabled = true
+        end
+    else
+        if hl then hl.Enabled = false end
+    end
+end
+
+local function setLabel(model, text, active, color)
+    if not model then return end
+    local gui = model:FindFirstChild("ESP_Label")
+    if active then
+        if not gui then
+            gui = Instance.new("BillboardGui")
+            gui.Name = "ESP_Label"
+            gui.Adornee = model
+            gui.Size = UDim2.new(0, 100, 0, 20)
+            gui.StudsOffset = Vector3.new(0, 3, 0)
+            gui.AlwaysOnTop = true
+
+            local label = Instance.new("TextLabel")
+            label.Size = UDim2.new(1, 0, 1, 0)
+            label.BackgroundTransparency = 1
+            label.Font = Enum.Font.SourceSansBold
+            label.TextSize = 16
+            label.TextStrokeTransparency = 0.3
+            label.TextColor3 = color
+            label.Name = "ESP_LabelText"
+            label.Parent = gui
+
+            gui.Parent = model
+        end
+
+        local label = gui:FindFirstChild("ESP_LabelText")
+        if label then
+            label.Text = text
+            label.TextColor3 = color
+        end
+        gui.Enabled = true
+    elseif gui then
+        gui.Enabled = false
+    end
+end
+
+local EXCLUDE_ANIMAL = { "Horse", "WendigoHorse", "Cow", "Capybara", "ReindeerHorse" }
+local function shouldProcessAnimal(model)
+    return not table.find(EXCLUDE_ANIMAL, model.Name)
+end
+
+local function getAnimalHealth(model)
+    local healthValue = model:FindFirstChild("Health")
+    if healthValue and healthValue:IsA("NumberValue") then
+        return healthValue.Value
+    end
+    return 0
+end
+
+local EXCLUDE_PLAYERS = { "hopa28hopa", "etc", "etc" }
+local function shouldProcessPlayer(model)
+    return not table.find(EXCLUDE_PLAYERS, model.Name)
+end
+
+--==================== MAIN ESP LOOP ====================
+
+--==================== MAIN ESP LOOP (SIN PARPADEO) ====================
+
+task.spawn(function()
+    while true do
+        -- Vegetal ESP (thunder / cactus)
+        if espVegetalEnabled then
+            for _, region in ipairs(regionTreePaths) do
+                local trees = getTreeFolder(region)
+                if trees then
+                    for _, tree in pairs(trees:GetChildren()) do
+                        local hp = getHealth(tree)
+                        local visible = hp > 501 and hasAnyAttachment(tree)
+                        if visible then
+                            setHighlight(tree, true, Color3.new(0, 0.4, 1))
+                            setLabel(tree, tree.Name .. " (" .. math.floor(hp) .. ")", true, Color3.new(0, 0.6, 1))
+                        end
+                        -- OJO: ya no llamamos setHighlight(tree,false) aquí
+                    end
+                end
+            end
+            for _, vinfo in ipairs(vegetationPaths) do
+                local folder = getFolder(vinfo[1], vinfo[2])
+                if folder then
+                    for _, veg in pairs(folder:GetChildren()) do
+                        local hp = getHealth(veg)
+                        local visible = hp > 501 and hasAnyAttachment(veg)
+                        if visible then
+                            setHighlight(veg, true, Color3.new(0, 0.4, 1))
+                            setLabel(veg, veg.Name .. " (" .. math.floor(hp) .. ")", true, Color3.new(0, 0.6, 1))
+                        end
+                    end
+                end
+            end
+        else
+            -- Solo cuando apagamos el ESP vegetal limpiamos todo
+            for _, region in ipairs(regionTreePaths) do
+                local trees = getTreeFolder(region)
+                if trees then
+                    for _, tree in pairs(trees:GetChildren()) do
+                        setHighlight(tree, false)
+                        setLabel(tree, "", false)
+                    end
+                end
+            end
+            for _, vinfo in ipairs(vegetationPaths) do
+                local folder = getFolder(vinfo[1], vinfo[2])
+                if folder then
+                    for _, veg in pairs(folder:GetChildren()) do
+                        setHighlight(veg, false)
+                        setLabel(veg, "", false)
+                    end
+                end
+            end
+        end
+
+        -- LootBag ESP
+        local ignore = workspace:FindFirstChild("Ignore")
+        if ignore then
+            for _, obj in ipairs(ignore:GetChildren()) do
+                if obj.Name == "LootBag" then
+                    if espLootBagEnabled then
+                        setHighlight(obj, true, Color3.new(1, 1, 0))
+                        setLabel(obj, "LootBag", true, Color3.new(1, 1, 0))
+                    else
+                        setHighlight(obj, false)
+                        setLabel(obj, "", false)
+                    end
+                end
+            end
+        end
+
+        -- Animal + Players ESP
+        local ent = workspace:FindFirstChild("WORKSPACE_Entities")
+        if ent then
+            local animals = ent:FindFirstChild("Animals")
+            if animals then
+                for _, a in pairs(animals:GetChildren()) do
+                    if espAnimalEnabled and shouldProcessAnimal(a) then
+                        local hp = getAnimalHealth(a)
+                        local useRed = hp > 300
+                        local color = useRed and Color3.new(1, 0, 0) or Color3.new(1, 1, 1)
+                        setHighlight(a, true, color)
+                        setLabel(a, a.Name .. " (" .. math.floor(hp) .. ")", true, color)
+                    else
+                        -- Solo limpiamos si el toggle está OFF
+                        if not espAnimalEnabled then
+                            setHighlight(a, false)
+                            setLabel(a, "", false)
+                        end
+                    end
+                end
+            end
+
+            local playersFolder = ent:FindFirstChild("Players")
+            if playersFolder then
+                for _, a in pairs(playersFolder:GetChildren()) do
+                    if espPlayersEnabled and shouldProcessPlayer(a) then
+                        setHighlight(a, true, Color3.new(0.2, 0.87, 0.18))
+                        setLabel(a, a.Name, true, Color3.new(1, 1, 1))
+                    else
+                        if not espPlayersEnabled then
+                            setHighlight(a, false)
+                            setLabel(a, "", false)
+                        end
+                    end
+                end
+            end
+        end
+
+        task.wait(0.5)
+    end
+end)
+
+
+--==================== WORLD EXTRAS FUNCS ====================
+
+local function deleteGrassAndBushes()
+    local geoRoot = workspace:FindFirstChild("WORKSPACE_Geometry")
+    if geoRoot then
+        local uni = geoRoot:FindFirstChild("Universal")
+        if uni then
+            local grassFolder = uni:FindFirstChild("Grass")
+            if grassFolder then
+                for _, obj in ipairs(grassFolder:GetChildren()) do
+                    pcall(function() obj:Destroy() end)
+                end
+            end
+        end
+    end
+
+    local regiones = {
+        "REGION_Swamp","REGION_Silverhills","REGION_RaiderCanyons","REGION_Plantation",
+        "REGION_Plains","REGION_Mountains","REGION_Highlands","REGION_ForestOfBones",
+        "REGION_Forest","REGION_Desert","REGION_BearpawValley"
+    }
+    local bushes = { "SmallBush1", "SmallBush2", "SmallBush3" }
+
+    for _, region in ipairs(regiones) do
+        local geo = workspace:FindFirstChild("WORKSPACE_Geometry")
+        if geo then
+            local reg = geo:FindFirstChild(region)
+            if reg then
+                local veg = reg:FindFirstChild("Vegetation")
+                if veg then
+                    for _, obj in ipairs(veg:GetChildren()) do
+                        for _, bushName in ipairs(bushes) do
+                            if obj.Name == bushName then
+                                pcall(function() obj:Destroy() end)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+local function applyNoFog()
+    Lighting.FogEnd        = 100000
+    Lighting.FogStart      = 0
+    Lighting.ClockTime     = 14
+    Lighting.Brightness    = 2
+    Lighting.GlobalShadows = false
+end
+
+local function applyFullbright()
+    local function dofullbright()
+        Lighting.Ambient           = Color3.new(1, 1, 1)
+        Lighting.ColorShift_Bottom = Color3.new(1, 1, 1)
+        Lighting.ColorShift_Top    = Color3.new(1, 1, 1)
+    end
+    dofullbright()
+    if not Lighting:FindFirstChild("FullbrightConn") then
+        local conn = Lighting.LightingChanged:Connect(dofullbright)
+        local tag = Instance.new("BoolValue")
+        tag.Name = "FullbrightConn"
+        tag.Parent = Lighting
+    end
+end
+
+--==================== UI FATALITY SYNERGIA WILD WEST ====================
+
+local Fatality = loadstring(game:HttpGet("https://raw.githubusercontent.com/4lpaca-pin/Fatality/refs/heads/main/src/source.luau"))()
+local Notification = Fatality:CreateNotifier()
+
+Fatality:Loader({
+    Name = "Synergia",
+    Duration = 3
+})
+
+local Window = Fatality.new({
+    Name = "Synergia",
+    Expire = "100d",
+})
+
+-- Menús principales
+local Visual = Window:AddMenu({
+    Name = "VISUAL",
+    Icon = "eye"
+})
+
+local Misc = Window:AddMenu({
+    Name = "MISC",
+    Icon = "settings"
+})
+
+--========== VISUAL: WORLD ESP ==========
+
+local TwWESpSection = Visual:AddSection({
+    Position = "left",
+    Name = "WORLD ESP"
+})
+
+TwWESpSection:AddToggle({
+    Name = "🌩 Thunder Trees / Cactus ESP",
+    Default = false,
+    Callback = function(val)
+        espVegetalEnabled = val
+        Notification:Notify({
+            Title = "Vegetal ESP",
+            Content = val and "Thunder trees / cactus ESP enabled." or "Vegetal ESP disabled.",
+            Duration = 3,
+            Icon = "eye"
+        })
+    end
+})
+
+TwWESpSection:AddToggle({
+    Name = "🦬 Animals / Legendary ESP",
+    Default = false,
+    Callback = function(val)
+        espAnimalEnabled = val
+        Notification:Notify({
+            Title = "Animal ESP",
+            Content = val and "Animals / legendary ESP enabled." or "Animal ESP disabled.",
+            Duration = 3,
+            Icon = "eye"
+        })
+    end
+})
+
+TwWESpSection:AddToggle({
+    Name = "👤 World Players ESP",
+    Default = false,
+    Callback = function(val)
+        espPlayersEnabled = val
+        Notification:Notify({
+            Title = "Players ESP",
+            Content = val and "World players ESP enabled." or "Players ESP disabled.",
+            Duration = 3,
+            Icon = "users"
+        })
+    end
+})
+
+TwWESpSection:AddToggle({
+    Name = "💰 LootBag ESP",
+    Default = false,
+    Callback = function(val)
+        espLootBagEnabled = val
+        Notification:Notify({
+            Title = "LootBag ESP",
+            Content = val and "LootBag ESP enabled." or "LootBag ESP disabled.",
+            Duration = 3,
+            Icon = "package"
+        })
+    end
+})
+
+--========== MISC: WORLD EXTRAS ==========
+
+local TwWExtrasSection = Misc:AddSection({
+    Position = "left",
+    Name = "WORLD EXTRAS"
+})
+
+TwWExtrasSection:AddButton({
+    Name = "🧹 Delete Grass & Bushes (FPS)",
+    Callback = function()
+        deleteGrassAndBushes()
+        Notification:Notify({
+            Title = "World Cleanup",
+            Content = "Grass and bushes deleted (FPS boost).",
+            Duration = 3,
+            Icon = "trash"
+        })
+    end
+})
+
+TwWExtrasSection:AddButton({
+    Name = "🌫️ NoFog (patched)",
+    Callback = function()
+        applyNoFog()
+        Notification:Notify({
+            Title = "NoFog",
+            Content = "Fog disabled (may be patched).",
+            Duration = 3,
+            Icon = "cloud-off"
+        })
+    end
+})
+
+TwWExtrasSection:AddButton({
+    Name = "💡 Fullbright",
+    Callback = function()
+        applyFullbright()
+        Notification:Notify({
+            Title = "Fullbright",
+            Content = "Fullbright applied.",
+            Duration = 3,
+            Icon = "sun"
+        })
+    end
+})
+
+TwWExtrasSection:AddLabel({
+    Name = "Freecam: SHIFT+P, arrows = speed."
+})
+
+end)
