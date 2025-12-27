@@ -56,18 +56,18 @@ local Fatality = loadstring(game:HttpGet("https://raw.githubusercontent.com/4lpa
 local Notification = Fatality:CreateNotifier()
 
 Fatality:Loader({
-    Name = "Synergia - Extras",
+    Name = "Synergia",
     Duration = 3
 })
 
 local Window = Fatality.new({
-    Name = "Synergia - Extras",
+    Name = "Synergia",
     Expire = "never",
 })
 
 -- ÚNICA TAB: EXTRAS
 local ExtrasMenu = Window:AddMenu({
-    Name = "EXTRAS",
+    Name = "main",
     Icon = "settings"
 })
 
