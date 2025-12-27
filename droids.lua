@@ -9,12 +9,12 @@ local Fatality = loadstring(game:HttpGet("https://raw.githubusercontent.com/4lpa
 local Notification = Fatality:CreateNotifier()
 
 Fatality:Loader({
-    Name = "Synergia - RGD",
+    Name = "Synergia",
     Duration = 3
 })
 
 local Window = Fatality.new({
-    Name = "Synergia - RGD",
+    Name = "Synergia",
     Expire = "never",
 })
 
@@ -317,7 +317,7 @@ DroidMenu:AddToggle({
 })
 
 DroidMenu:AddToggle({
-    Name = "Auto Room (flag)",
+    Name = "Auto Room (???)",
     Default = false,
     Callback = function(v)
         getgenv().RGD_AutoRoom = v
@@ -327,7 +327,7 @@ DroidMenu:AddToggle({
 -- HITBOX ENEMIES
 
 DroidMenu:AddToggle({
-    Name = "Enemy HitboxK6",
+    Name = "Enemy HitboxK6 )buggy)",
     Default = false,
     Callback = function(v)
         getgenv().HK6_Enabled = v
@@ -443,7 +443,7 @@ MapMenu:AddToggle({
 })
 
 MapMenu:AddToggle({
-    Name = "Bring all Items on Ground",
+    Name = "Bring all Items on Ground (bug)",
     Default = false,
     Callback = function(v)
         getgenv().RGD_BringGroundItems = v
@@ -505,7 +505,7 @@ PlayerMenu:AddTextbox({
 })
 
 PlayerMenu:AddButton({
-    Name = "HitBox+ (Laggy)",
+    Name = "HitBox+ (buggy)",
     Callback = function()
         local lp = Players.LocalPlayer
         local bp = lp and lp.Backpack
