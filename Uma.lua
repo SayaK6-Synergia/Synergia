@@ -33,15 +33,16 @@ local AdminList = {
     "MilkingSylph", "Kathexy", "Delta_X295", "endlessdock", "meliodas3524"
 }
 
--- 🔥 STAMINA 150 TOGGLE
+-- 🔥 PLAYER SECTION CON DOS OPCIONES DE STAMINA
 do
     local PlayerSection = Misc:AddSection({
         Position = 'left',
         Name = "PLAYER"
     })
     
-    local StaminaToggle = PlayerSection:AddToggle({
-        Name = "🔒 INF Stamina",
+    -- Opción 1: INF Stamina 150 (original)
+    local Stamina150Toggle = PlayerSection:AddToggle({
+        Name = "🔒 INF Stamina 150",
         Default = false,
         Callback = function(value)
             if value then
@@ -49,7 +50,7 @@ do
                 local LocalPlayer = Players.LocalPlayer
                 local playerName = LocalPlayer.Name
                 
-                local function setStamina()
+                local function setStamina150()
                     pcall(function()
                         local playerFolder = workspace.Players:FindFirstChild(playerName)
                         if playerFolder then
@@ -64,7 +65,7 @@ do
                     end)
                 end
                 
-                if not getgenv().StaminaHook then
+                if not getgenv().StaminaHook150 then
                     local mt = getrawmetatable(game)
                     local old = mt.__namecall
                     setreadonly(mt, false)
@@ -76,39 +77,123 @@ do
                         return old(self, ...)
                     end)
                     setreadonly(mt, true)
-                    getgenv().StaminaHook = true
+                    getgenv().StaminaHook150 = true
                 end
                 
-                local staminaConnection = game:GetService("RunService").Heartbeat:Connect(setStamina)
+                local staminaConnection = game:GetService("RunService").Heartbeat:Connect(setStamina150)
                 local backupConnection = task.spawn(function()
-                    while StaminaToggle.Value do
-                        setStamina()
+                    while Stamina150Toggle.Value do
+                        setStamina150()
                         task.wait(0.05)
                     end
                 end)
                 
-                StaminaToggle.Connections = {staminaConnection, backupConnection}
+                Stamina150Toggle.Connections = {staminaConnection, backupConnection}
                 
                 Notification:Notify({
-                    Title = "✅ Stamina ON",
+                    Title = "✅ Stamina 150 ON",
                     Content = "🔒 Stamina 150 INFINITE",
                     Duration = 3,
                     Icon = "shield-check"
                 })
             else
-                if StaminaToggle.Connections then
-                    for _, connection in pairs(StaminaToggle.Connections) do
+                if Stamina150Toggle.Connections then
+                    for _, connection in pairs(Stamina150Toggle.Connections) do
                         if typeof(connection) == "RBXScriptConnection" then
                             connection:Disconnect()
                         elseif typeof(connection) == "thread" then
                             task.cancel(connection)
                         end
                     end
-                    StaminaToggle.Connections = nil
+                    Stamina150Toggle.Connections = nil
                 end
                 Notification:Notify({
-                    Title = "❌ Stamina OFF",
-                    Content = "Stamina off",
+                    Title = "❌ Stamina 150 OFF",
+                    Content = "Stamina 150 off",
+                    Duration = 2,
+                    Icon = "shield-off"
+                })
+            end
+        end
+    })
+    
+    -- Opción 2: LEGIT INF Stamina (mínimo 5) NUEVA
+    local LegitStaminaToggle = PlayerSection:AddToggle({
+        Name = "🟢 Legit Inf Stamina",
+        Default = false,
+        Callback = function(value)
+            local Players = game:GetService("Players")
+            local LocalPlayer = Players.LocalPlayer
+            local playerName = LocalPlayer.Name
+            
+            local function checkLegitStamina()
+                pcall(function()
+                    local playerFolder = workspace.Players:FindFirstChild(playerName)
+                    if playerFolder then
+                        local info = playerFolder:FindFirstChild("Info")
+                        if info then
+                            local stamina = info:FindFirstChild("Stamina")
+                            if stamina and stamina:IsA("NumberValue") then
+                                -- Mantiene mínimo 5, baja normal pero nunca bajo 5
+                                if stamina.Value < 2 then
+                                    stamina.Value = 2
+                                end
+                            end
+                        end
+                    end
+                end)
+            end
+            
+            if value then
+                -- Hook anti-server específico para legit stamina
+                if not getgenv().LegitStaminaHook then
+                    local mt = getrawmetatable(game)
+                    local old = mt.__namecall
+                    setreadonly(mt, false)
+                    mt.__namecall = newcclosure(function(self, ...)
+                        local method = getnamecallmethod()
+                        if method == "FireServer" and tostring(self):find("Stamina") then
+                            return
+                        end
+                        return old(self, ...)
+                    end)
+                    setreadonly(mt, true)
+                    getgenv().LegitStaminaHook = true
+                end
+                
+                -- Loop principal cada frame
+                local heartbeatConnection = game:GetService("RunService").Heartbeat:Connect(checkLegitStamina)
+                
+                -- Backup cada 0.1s
+                local backupConnection = task.spawn(function()
+                    while LegitStaminaToggle.Value do
+                        checkLegitStamina()
+                        task.wait(0.1)
+                    end
+                end)
+                
+                LegitStaminaToggle.Connections = {heartbeatConnection, backupConnection}
+                
+                Notification:Notify({
+                    Title = "✅ Legit Stamina ON",
+                    Content = "🟢 legit stamina",
+                    Duration = 3,
+                    Icon = "shield-check"
+                })
+            else
+                if LegitStaminaToggle.Connections then
+                    for _, connection in pairs(LegitStaminaToggle.Connections) do
+                        if typeof(connection) == "RBXScriptConnection" then
+                            connection:Disconnect()
+                        elseif typeof(connection) == "thread" then
+                            task.cancel(connection)
+                        end
+                    end
+                    LegitStaminaToggle.Connections = nil
+                end
+                Notification:Notify({
+                    Title = "❌ Legit Stamina OFF",
+                    Content = "Stamina legit off",
                     Duration = 2,
                     Icon = "shield-off"
                 })
@@ -121,11 +206,11 @@ end
 do
     local AntiAdminSection = Misc:AddSection({
         Position = 'right',
-        Name = "PROTECCIÓN"
+        Name = "PROTECTION"
     })
     
     local AntiAdminToggle = AntiAdminSection:AddToggle({
-        Name = "🛡️ Detectar Admins",
+        Name = "🛡️ Detect Admins",
         Default = false,
         Callback = function(value)
             if value then
@@ -192,4 +277,4 @@ do
     })
 end
 
-print("🚀 Synergia LOAD - Stamina + Anti Admin!")
+print("🚀 Synergia LOAD - Stamina 150 + Legit 5 + Anti Admin!")
