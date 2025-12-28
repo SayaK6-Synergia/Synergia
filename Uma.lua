@@ -22,6 +22,12 @@ local Misc = Window:AddMenu({
     Icon = "settings"
 })
 
+-- 🔥 SERVICIOS Y VARIABLES GLOBALES
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local playerName = LocalPlayer.Name
+local RunService = game:GetService("RunService")
+
 -- 🔥 ADMINS LIST
 local AdminList = {
     "uffuez", "Dexne5t", "Duckie_Zinc2", "Leeoyoo", "lzwans", "Gemononis",
@@ -33,63 +39,99 @@ local AdminList = {
     "MilkingSylph", "Kathexy", "Delta_X295", "endlessdock", "meliodas3524"
 }
 
--- 🔥 PLAYER SECTION CON DOS OPCIONES DE STAMINA
+-- 🔥 ESTADOS DE TOGGLES
+local stamina150Active = false
+local legitStaminaActive = false
+local antiAdminActive = false
+local staminaHookActive = false
+
+-- 🔥 FUNCIÓN HOOK STAMINA (UNA SOLA VEZ)
+local function createStaminaHook()
+    if staminaHookActive then return end
+    pcall(function()
+        local mt = getrawmetatable(game)
+        local old = mt.__namecall
+        setreadonly(mt, false)
+        mt.__namecall = newcclosure(function(self, ...)
+            local method = getnamecallmethod()
+            if method == "FireServer" and tostring(self):find("Stamina") then
+                return
+            end
+            return old(self, ...)
+        end)
+        setreadonly(mt, true)
+        staminaHookActive = true
+    end)
+end
+
+-- 🔥 FUNCIÓN STAMINA 150
+local function setStamina150()
+    pcall(function()
+        local playerFolder = workspace.Players:FindFirstChild(playerName)
+        if playerFolder then
+            local info = playerFolder:FindFirstChild("Info")
+            if info then
+                local stamina = info:FindFirstChild("Stamina")
+                if stamina and stamina:IsA("NumberValue") then
+                    stamina.Value = 150
+                end
+            end
+        end
+    end)
+end
+
+-- 🔥 FUNCIÓN LEGIT STAMINA (MÍNIMO 5) - MEJORADA
+local function checkLegitStamina()
+    pcall(function()
+        local playerFolder = workspace.Players:FindFirstChild(playerName)
+        if playerFolder then
+            local info = playerFolder:FindFirstChild("Info")
+            if info then
+                local stamina = info:FindFirstChild("Stamina")
+                if stamina and stamina:IsA("NumberValue") then
+                    -- MÁS AGRESIVO: Siempre mantiene >= 2
+                    if stamina.Value < 2 then
+                        stamina.Value = 2
+                    end
+                end
+            end
+        end
+    end)
+end
+
+-- 🔥 LOOP PRINCIPAL LEGIT STAMINA (MÁS RÁPIDO)
+local legitStaminaConnection = nil
+local function startLegitStaminaLoop()
+    if legitStaminaConnection then return end
+    
+    legitStaminaConnection = RunService.Heartbeat:Connect(function()
+        if legitStaminaActive then
+            checkLegitStamina()
+        end
+    end)
+end
+
+-- 🔥 PLAYER SECTION
 do
     local PlayerSection = Misc:AddSection({
         Position = 'left',
         Name = "PLAYER"
     })
     
-    -- Opción 1: INF Stamina 150 (original)
-    local Stamina150Toggle = PlayerSection:AddToggle({
+    -- TOGGLE 1: INF Stamina 150
+    PlayerSection:AddToggle({
         Name = "🔒 INF Stamina 150",
         Default = false,
         Callback = function(value)
+            stamina150Active = value
             if value then
-                local Players = game:GetService("Players")
-                local LocalPlayer = Players.LocalPlayer
-                local playerName = LocalPlayer.Name
-                
-                local function setStamina150()
-                    pcall(function()
-                        local playerFolder = workspace.Players:FindFirstChild(playerName)
-                        if playerFolder then
-                            local info = playerFolder:FindFirstChild("Info")
-                            if info then
-                                local stamina = info:FindFirstChild("Stamina")
-                                if stamina and stamina:IsA("NumberValue") then
-                                    stamina.Value = 150
-                                end
-                            end
-                        end
-                    end)
-                end
-                
-                if not getgenv().StaminaHook150 then
-                    local mt = getrawmetatable(game)
-                    local old = mt.__namecall
-                    setreadonly(mt, false)
-                    mt.__namecall = newcclosure(function(self, ...)
-                        local method = getnamecallmethod()
-                        if method == "FireServer" and tostring(self):find("Stamina") then
-                            return
-                        end
-                        return old(self, ...)
-                    end)
-                    setreadonly(mt, true)
-                    getgenv().StaminaHook150 = true
-                end
-                
-                local staminaConnection = game:GetService("RunService").Heartbeat:Connect(setStamina150)
-                local backupConnection = task.spawn(function()
-                    while Stamina150Toggle.Value do
+                createStaminaHook()
+                task.spawn(function()
+                    while stamina150Active do
                         setStamina150()
-                        task.wait(0.05)
+                        task.wait()
                     end
                 end)
-                
-                Stamina150Toggle.Connections = {staminaConnection, backupConnection}
-                
                 Notification:Notify({
                     Title = "✅ Stamina 150 ON",
                     Content = "🔒 Stamina 150 INFINITE",
@@ -97,16 +139,6 @@ do
                     Icon = "shield-check"
                 })
             else
-                if Stamina150Toggle.Connections then
-                    for _, connection in pairs(Stamina150Toggle.Connections) do
-                        if typeof(connection) == "RBXScriptConnection" then
-                            connection:Disconnect()
-                        elseif typeof(connection) == "thread" then
-                            task.cancel(connection)
-                        end
-                    end
-                    Stamina150Toggle.Connections = nil
-                end
                 Notification:Notify({
                     Title = "❌ Stamina 150 OFF",
                     Content = "Stamina 150 off",
@@ -117,80 +149,22 @@ do
         end
     })
     
-    -- Opción 2: LEGIT INF Stamina (mínimo 5) NUEVA
-    local LegitStaminaToggle = PlayerSection:AddToggle({
+    -- TOGGLE 2: LEGIT INF Stamina - ARREGLADO
+    PlayerSection:AddToggle({
         Name = "🟢 Legit Inf Stamina",
         Default = false,
         Callback = function(value)
-            local Players = game:GetService("Players")
-            local LocalPlayer = Players.LocalPlayer
-            local playerName = LocalPlayer.Name
-            
-            local function checkLegitStamina()
-                pcall(function()
-                    local playerFolder = workspace.Players:FindFirstChild(playerName)
-                    if playerFolder then
-                        local info = playerFolder:FindFirstChild("Info")
-                        if info then
-                            local stamina = info:FindFirstChild("Stamina")
-                            if stamina and stamina:IsA("NumberValue") then
-                                -- Mantiene mínimo 5, baja normal pero nunca bajo 5
-                                if stamina.Value < 2 then
-                                    stamina.Value = 2
-                                end
-                            end
-                        end
-                    end
-                end)
-            end
-            
+            legitStaminaActive = value
             if value then
-                -- Hook anti-server específico para legit stamina
-                if not getgenv().LegitStaminaHook then
-                    local mt = getrawmetatable(game)
-                    local old = mt.__namecall
-                    setreadonly(mt, false)
-                    mt.__namecall = newcclosure(function(self, ...)
-                        local method = getnamecallmethod()
-                        if method == "FireServer" and tostring(self):find("Stamina") then
-                            return
-                        end
-                        return old(self, ...)
-                    end)
-                    setreadonly(mt, true)
-                    getgenv().LegitStaminaHook = true
-                end
-                
-                -- Loop principal cada frame
-                local heartbeatConnection = game:GetService("RunService").Heartbeat:Connect(checkLegitStamina)
-                
-                -- Backup cada 0.1s
-                local backupConnection = task.spawn(function()
-                    while LegitStaminaToggle.Value do
-                        checkLegitStamina()
-                        task.wait(0.1)
-                    end
-                end)
-                
-                LegitStaminaToggle.Connections = {heartbeatConnection, backupConnection}
-                
+                createStaminaHook()
+                startLegitStaminaLoop()
                 Notification:Notify({
                     Title = "✅ Legit Stamina ON",
-                    Content = "🟢 legit stamina",
+                    Content = "🟢 Min 2 - Heartbeat on",
                     Duration = 3,
                     Icon = "shield-check"
                 })
             else
-                if LegitStaminaToggle.Connections then
-                    for _, connection in pairs(LegitStaminaToggle.Connections) do
-                        if typeof(connection) == "RBXScriptConnection" then
-                            connection:Disconnect()
-                        elseif typeof(connection) == "thread" then
-                            task.cancel(connection)
-                        end
-                    end
-                    LegitStaminaToggle.Connections = nil
-                end
                 Notification:Notify({
                     Title = "❌ Legit Stamina OFF",
                     Content = "Stamina legit off",
@@ -202,53 +176,46 @@ do
     })
 end
 
--- 🔥 ANTI ADMIN REAL (TE PROTEGE)
+-- 🔥 ANTI ADMIN
 do
     local AntiAdminSection = Misc:AddSection({
         Position = 'right',
-        Name = "PROTECTION"
+        Name = "PROTECCIÓN"
     })
     
-    local AntiAdminToggle = AntiAdminSection:AddToggle({
+    local function checkAdmin(player)
+        if table.find(AdminList, player.Name) then
+            Notification:Notify({
+                Title = "🚨 Admin detected",
+                Content = "👑 " .. player.Name .. " is on your server",
+                Duration = 5,
+                Icon = "shield-alert"
+            })
+            task.spawn(function()
+                task.wait(2)
+                game:GetService("TeleportService"):Teleport(game.PlaceId, LocalPlayer)
+            end)
+        end
+    end
+    
+    AntiAdminSection:AddToggle({
         Name = "🛡️ Detect Admins",
         Default = false,
         Callback = function(value)
+            antiAdminActive = value
             if value then
-                local Players = game:GetService("Players")
-                
-                local function checkAdmin(player)
-                    if table.find(AdminList, player.Name) then
-                        Notification:Notify({
-                            Title = "🚨 detected admin ",
-                            Content = "👑 " .. player.Name .. " is on server",
-                            Duration = 5,
-                            Icon = "shield-alert"
-                        })
-                        
-                        -- OPCIÓN: Auto-rejoin cuando detecta admin
-                        task.spawn(function()
-                            task.wait(2)
-                            game:GetService("TeleportService"):Teleport(game.PlaceId, Players.LocalPlayer)
-                        end)
-                    end
-                end
-                
-                -- Check admins existentes
                 for _, player in pairs(Players:GetPlayers()) do
-                    if player ~= Players.LocalPlayer then
+                    if player ~= LocalPlayer then
                         checkAdmin(player)
                     end
                 end
                 
-                -- Detectar nuevos joins
-                local playerAddedConnection = Players.PlayerAdded:Connect(function(player)
-                    if AntiAdminToggle.Value then
+                getgenv().antiAdminConnection = Players.PlayerAdded:Connect(function(player)
+                    if antiAdminActive then
                         task.wait(2)
                         checkAdmin(player)
                     end
                 end)
-                
-                AntiAdminToggle.Connections = {playerAddedConnection}
                 
                 Notification:Notify({
                     Title = "✅ Anti Admin ON",
@@ -256,19 +223,14 @@ do
                     Duration = 4,
                     Icon = "eye"
                 })
-                
             else
-                if AntiAdminToggle.Connections then
-                    for _, connection in pairs(AntiAdminToggle.Connections) do
-                        if typeof(connection) == "RBXScriptConnection" then
-                            connection:Disconnect()
-                        end
-                    end
-                    AntiAdminToggle.Connections = nil
+                if getgenv().antiAdminConnection then
+                    getgenv().antiAdminConnection:Disconnect()
+                    getgenv().antiAdminConnection = nil
                 end
                 Notification:Notify({
                     Title = "❌ Anti Admin OFF",
-                    Content = "no protection",
+                    Content = "protection off",
                     Duration = 2,
                     Icon = "eye-off"
                 })
@@ -277,4 +239,4 @@ do
     })
 end
 
-print("🚀 Synergia LOAD - Stamina 150 + Legit 5 + Anti Admin!")
+print("🚀 Synergia LEGIT FIXED!")
