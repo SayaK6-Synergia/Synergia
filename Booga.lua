@@ -1016,6 +1016,31 @@ local Visual = Window:AddMenu({
     Icon = "eye"
 })
 
+-- VOID TELEPORT
+local Void = Window:AddMenu({
+    Name = "Void",
+    Icon = "🌌"
+})
+
+local VoidSection = Void:AddSection({
+    Position = "left",
+    Name = "TELEPORTS"
+})
+
+VoidSection:AddButton({
+    Name = "🚀 Tp Void (11879754496)",
+    Callback = function()
+        Notification:Notify({
+            Title = "Teleporting...",
+            Content = "Loading Void Dimension...",
+            Duration = 3,
+            Icon = "zap"
+        })
+        TeleportService:Teleport(11879754496)
+    end
+})
+
+
 -- FARM: AUTOPICKUP + HEAL + SPEED
 
 do
