@@ -1,69 +1,351 @@
-pcall(function()
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
+local Window = Rayfield:CreateWindow({
+    Name = "Synergia - RGD",
+    Icon = 0,
+    LoadingTitle = "Loading Synergia...",
+    LoadingSubtitle = "by SayaK6",
+    Theme = "Dark",
 
---================ FATALITY / SYNERGIA ================
-
-local Fatality = loadstring(game:HttpGet("https://raw.githubusercontent.com/4lpaca-pin/Fatality/refs/heads/main/src/source.luau"))()
-local Notification = Fatality:CreateNotifier()
-
-Fatality:Loader({
-    Name = "Synergia",
-    Duration = 3
+    DisableRayfieldPrompts = false,
+    DisableMobileWindowMovable = false,
+    Size = UDim2.new(0, 580, 0, 520),
+    Transparency = 0.25,
+    BlacklistedFrameNames = {"TopbarContainer"},
+    BlacklistedGroupNames = {}
 })
 
-local Window = Fatality.new({
-    Name = "Synergia",
-    Expire = "never",
-})
+local RunService   = game:GetService("RunService")
+local Players      = game:GetService("Players")
+local LocalPlayer  = Players.LocalPlayer
 
-local MainMenu = Window:AddMenu({
-    Name = "RGD",
-    Icon = "settings"
-})
+-- ===== Principal =====
+local autoKillEnabled   = false
+local autoClickEnabled  = false
+local autoShopEnabled   = false
+local autoMysteryEnabled= false
+local autoWinEnabled    = false
+local autoArenaEnabled  = false
 
---================= FLAGS (TOGGLES) =================
+local lastKillTime   = 0
+local lastClickTime  = 0
+local lastShopTime   = 0
+local lastMysteryTime= 0
+local lastWinTime    = 0
+local lastArenaTime  = 0
 
-getgenv().RGD_KillAllDroids     = false
-getgenv().RGD_BringCircuits     = false
-getgenv().RGD_AnchorDroids      = false
-getgenv().RGD_UnAnchorDroids    = false
-getgenv().RGD_LavaImmunity      = false
-getgenv().RGD_WaterQuicksandImm = false
-getgenv().RGD_AcidImmunity      = false
-getgenv().RGD_SolidWater        = false
-getgenv().RGD_SolidLava         = false
-getgenv().RGD_PressButtons      = false
-getgenv().RGD_BringGroundItems  = false
-getgenv().RGD_AutoRoom          = false
+local killInterval   = 1
+local clickInterval  = 2
+local shopInterval   = 2
+local mysteryInterval= 2
+local winInterval    = 1
+local arenaInterval  = 1
 
--- flags hitbox enemigos
-getgenv().HK6_Enabled = false
-getgenv().HK6_Size    = 10
-getgenv().HK6_Transp  = 0.4
+local mainHeartbeat  = nil
 
-local originalEnemyData = {}
+-- ===== Loops (getgenv) =====
+getgenv().RGD_BringCircuits   = false
+getgenv().RGD_AnchorDroids    = false
+getgenv().RGD_UnAnchorDroids  = false
+getgenv().RGD_BringOrnaments  = false
 
---================= LOOPS =================
+local function getCharacter()
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    return char
+end
 
-task.spawn(function()
-    while task.wait(0.1) do
-        if getgenv().RGD_KillAllDroids then
-            for _, v in pairs(workspace.Room.Enemies:GetDescendants()) do
-                if v:IsA("Humanoid") and v.Parent.Name ~= LocalPlayer.Name then
-                    v.Health = 0
+-- ===== Loop principal =====
+local function startMainLoop()
+    if mainHeartbeat then
+        mainHeartbeat:Disconnect()
+    end
+
+    mainHeartbeat = RunService.Heartbeat:Connect(function()
+        local now         = tick()
+        local currentRoom = workspace:FindFirstChild("Room")
+
+        -- Auto Kill
+        if autoKillEnabled and now - lastKillTime >= killInterval then
+            lastKillTime = now
+            if currentRoom then
+                for _, obj in ipairs(currentRoom:GetDescendants()) do
+                    local hum = obj:FindFirstChildOfClass("Humanoid")
+                    if hum and hum.Health > 0 then
+                        hum.Health = 0
+                    end
                 end
             end
         end
-    end
-end)
 
+        -- Auto Click
+        if autoClickEnabled and now - lastClickTime >= clickInterval then
+            lastClickTime = now
+            if currentRoom then
+                local enemies = currentRoom:FindFirstChild("Enemies")
+                if enemies then
+                    for _, button in ipairs(enemies:GetDescendants()) do
+                        if button.Name == "Button" and button:IsA("BasePart") then
+                            local cd = button:FindFirstChildOfClass("ClickDetector")
+                            if cd then
+                                cd.MaxActivationDistance = 999999
+                                pcall(function() fireclickdetector(cd) end)
+                            end
+                            for _, d in ipairs(button:GetDescendants()) do
+                                if d:IsA("ClickDetector") then
+                                    if d:FindFirstChild("RemoteEvent") then
+                                        pcall(function() d.RemoteEvent:FireServer() end)
+                                    end
+                                    pcall(function() fireclickdetector(d) end)
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        -- Auto Shop
+        if autoShopEnabled and now - lastShopTime >= shopInterval then
+            lastShopTime = now
+            if currentRoom then
+                for _, part in ipairs(currentRoom:GetDescendants()) do
+                    if part.Name == "ShopButton" and part:IsA("BasePart") then
+                        local cd = part:FindFirstChildOfClass("ClickDetector")
+                        if cd then
+                            cd.MaxActivationDistance = 999999
+                            pcall(function() fireclickdetector(cd) end)
+                        end
+                        for _, d in ipairs(part:GetDescendants()) do
+                            if d:IsA("ClickDetector") then
+                                pcall(function() fireclickdetector(d) end)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        -- Auto Mystery
+        if autoMysteryEnabled and now - lastMysteryTime >= mysteryInterval then
+            lastMysteryTime = now
+            if currentRoom then
+                for _, part in ipairs(currentRoom:GetDescendants()) do
+                    if part.Name == "MysteryButton" and part:IsA("BasePart") then
+                        local cd = part:FindFirstChildOfClass("ClickDetector")
+                        if cd then
+                            cd.MaxActivationDistance = 999999
+                            pcall(function() fireclickdetector(cd) end)
+                        end
+                        for _, d in ipairs(part:GetDescendants()) do
+                            if d:IsA("ClickDetector") then
+                                pcall(function() fireclickdetector(d) end)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        -- Auto Win
+        if autoWinEnabled and now - lastWinTime >= winInterval then
+            lastWinTime = now
+            if currentRoom then
+                for _, part in ipairs(currentRoom:GetDescendants()) do
+                    if part.Name == "WinButton" and part:IsA("BasePart") then
+                        local cd = part:FindFirstChildOfClass("ClickDetector")
+                        if cd then
+                            cd.MaxActivationDistance = 999999
+                            pcall(function() fireclickdetector(cd) end)
+                        end
+                        for _, d in ipairs(part:GetDescendants()) do
+                            if d:IsA("ClickDetector") then
+                                d.MaxActivationDistance = 999999
+                                pcall(function() fireclickdetector(d) end)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        -- Auto Arena
+        if autoArenaEnabled and now - lastArenaTime >= arenaInterval then
+            lastArenaTime = now
+            if currentRoom then
+                for _, part in ipairs(currentRoom:GetDescendants()) do
+                    if part.Name == "ArenaButton" and part:IsA("BasePart") then
+                        local cd = part:FindFirstChildOfClass("ClickDetector")
+                        if cd then
+                            cd.MaxActivationDistance = 999999
+                            pcall(function() fireclickdetector(cd) end)
+                        end
+                        for _, d in ipairs(part:GetDescendants()) do
+                            if d:IsA("ClickDetector") then
+                                d.MaxActivationDistance = 999999
+                                pcall(function() fireclickdetector(d) end)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end)
+end
+
+-- ===== Tab Principal =====
+local MainTab = Window:CreateTab("🏠 Main", 4483362458)
+
+MainTab:CreateLabel("Auto", {TextSize = 16})
+MainTab:CreateDivider()
+
+MainTab:CreateLabel("Script 1: Auto Kill (1s)")
+local AutoKillToggle = MainTab:CreateToggle({
+    Name = "AutoKillAura",
+    CurrentValue = false,
+    Flag = "AutoKill",
+    Callback = function(v) autoKillEnabled = v if v then startMainLoop() end end,
+})
+
+MainTab:CreateDivider()
+MainTab:CreateLabel("Script 2: Auto Click (2s)")
+local AutoClickToggle = MainTab:CreateToggle({
+    Name = "Auto Buttons",
+    CurrentValue = false,
+    Flag = "AutoClick",
+    Callback = function(v) autoClickEnabled = v if v then startMainLoop() end end,
+})
+
+MainTab:CreateDivider()
+MainTab:CreateLabel("Script 3: Auto Shop (2s)")
+local AutoShopToggle = MainTab:CreateToggle({
+    Name = "Auto Skip Shop",
+    CurrentValue = false,
+    Flag = "AutoShop",
+    Callback = function(v) autoShopEnabled = v if v then startMainLoop() end end,
+})
+
+MainTab:CreateDivider()
+MainTab:CreateLabel("Script 4: Auto Mystery (2s)")
+local AutoMysteryToggle = MainTab:CreateToggle({
+    Name = "auto Mystery Button",
+    CurrentValue = false,
+    Flag = "AutoMystery",
+    Callback = function(v) autoMysteryEnabled = v if v then startMainLoop() end end,
+})
+
+MainTab:CreateDivider()
+MainTab:CreateLabel("Script 5: Auto Win Button (1s)")
+local AutoWinToggle = MainTab:CreateToggle({
+    Name = "AutoFinalWin (boss button)",
+    CurrentValue = false,
+    Flag = "AutoFinalWin (boss button)",
+    Callback = function(v) autoWinEnabled = v if v then startMainLoop() end end,
+})
+
+MainTab:CreateDivider()
+MainTab:CreateLabel("Script 6: Auto Arena Button (1s)")
+local AutoArenaToggle = MainTab:CreateToggle({
+    Name = "AutoBoss",
+    CurrentValue = false,
+    Flag = "AutoBoss",
+    Callback = function(v) autoArenaEnabled = v if v then startMainLoop() end end,
+})
+
+-- ===== Tab Config (simple) =====
+local ConfigTab = Window:CreateTab("⚙️ Settings", 4483362458)
+
+ConfigTab:CreateLabel("Turn Off all", {TextSize = 14})
+ConfigTab:CreateButton({
+    Name = "OFF all scripts",
+    Callback = function()
+        autoKillEnabled    = false
+        autoClickEnabled   = false
+        autoShopEnabled    = false
+        autoMysteryEnabled = false
+        autoWinEnabled     = false
+        autoArenaEnabled   = false
+
+        AutoKillToggle:Set(false)
+        AutoClickToggle:Set(false)
+        AutoShopToggle:Set(false)
+        AutoMysteryToggle:Set(false)
+        AutoWinToggle:Set(false)
+        AutoArenaToggle:Set(false)
+
+        if mainHeartbeat then
+            mainHeartbeat:Disconnect()
+            mainHeartbeat = nil
+        end
+
+        Rayfield:Notify({
+            Title = "✓ Éxito",
+            Content = "Todos los scripts han sido desactivados",
+            Duration = 2,
+            Image = 4483362458,
+        })
+    end,
+})
+
+-- ===== Tab Loops =====
+local LoopsTab = Window:CreateTab("🔁 Loops", 4483362458)
+
+LoopsTab:CreateLabel("Loops Circuits / Droids / Ornaments", {TextSize = 14})
+
+LoopsTab:CreateToggle({
+    Name = "Bring Circuits",
+    CurrentValue = false,
+    Flag = "RGD_BringCircuits",
+    Callback = function(v) getgenv().RGD_BringCircuits = v end,
+})
+
+LoopsTab:CreateToggle({
+    Name = "Anchor Droids",
+    CurrentValue = false,
+    Flag = "RGD_AnchorDroids",
+    Callback = function(v) getgenv().RGD_AnchorDroids = v end,
+})
+
+LoopsTab:CreateToggle({
+    Name = "Unanchor Droids",
+    CurrentValue = false,
+    Flag = "RGD_UnAnchorDroids",
+    Callback = function(v) getgenv().RGD_UnAnchorDroids = v end,
+})
+
+LoopsTab:CreateToggle({
+    Name = "Bring Ornaments (event)",
+    CurrentValue = false,
+    Flag = "RGD_BringOrnaments",
+    Callback = function(v) getgenv().RGD_BringOrnaments = v end,
+})
+
+-- ===== Tab TPs =====
+local TPTab = Window:CreateTab("📍 TPs", 4483362458)
+
+TPTab:CreateLabel("Teleports", {TextSize = 14})
+
+TPTab:CreateButton({
+    Name = "TP NexusCrystal (chritsmas event final room)",
+    Callback = function()
+        task.spawn(function()
+            local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+            local hrp  = char:WaitForChild("HumanoidRootPart")
+
+            local room  = workspace:WaitForChild("Room")
+            local nexus = room:WaitForChild("NexusCrystal")
+
+            local offset = Vector3.new(0, 5, 0)
+            hrp.CFrame = nexus.CFrame + offset
+        end)
+    end,
+})
+
+-- ===== Loops de getgenv =====
 task.spawn(function()
     while task.wait(0.1) do
         if getgenv().RGD_BringCircuits then
-            local char = LocalPlayer.Character
-            local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+            local char = getCharacter()
+            local hrp  = char:FindFirstChild("HumanoidRootPart")
             if hrp then
                 for _, v in pairs(workspace:GetDescendants()) do
                     if v:IsA("UnionOperation") and v.Name == "Circuit" then
@@ -79,9 +361,13 @@ end)
 task.spawn(function()
     while task.wait(0.1) do
         if getgenv().RGD_AnchorDroids then
-            for _, v in pairs(workspace.Room.Enemies:GetDescendants()) do
-                if v:IsA("Part") and v.Name == "Head" then
-                    v.Anchored = true
+            local room    = workspace:FindFirstChild("Room")
+            local enemies = room and room:FindFirstChild("Enemies")
+            if enemies then
+                for _, v in pairs(enemies:GetDescendants()) do
+                    if v:IsA("Part") and v.Name == "Head" then
+                        v.Anchored = true
+                    end
                 end
             end
         end
@@ -91,100 +377,12 @@ end)
 task.spawn(function()
     while task.wait(0.1) do
         if getgenv().RGD_UnAnchorDroids then
-            for _, v in pairs(workspace.Room.Enemies:GetDescendants()) do
-                if v:IsA("Part") and v.Name == "Head" then
-                    v.Anchored = false
-                end
-            end
-        end
-    end
-end)
-
-task.spawn(function()
-    while task.wait(0.2) do
-        if getgenv().RGD_LavaImmunity then
-            for _, v in pairs(workspace:GetDescendants()) do
-                if v.Name == "Lava" and v:FindFirstChild("TouchInterest") then
-                    v.TouchInterest:Destroy()
-                end
-            end
-        end
-    end
-end)
-
-task.spawn(function()
-    while task.wait(0.2) do
-        if getgenv().RGD_WaterQuicksandImm then
-            for _, v in pairs(workspace:GetDescendants()) do
-                if v.Name == "Killer" and v:FindFirstChild("TouchInterest") then
-                    v.TouchInterest:Destroy()
-                end
-            end
-        end
-    end
-end)
-
-task.spawn(function()
-    while task.wait(0.2) do
-        if getgenv().RGD_AcidImmunity then
-            for _, v in pairs(workspace:GetDescendants()) do
-                if v.Name == "Acid" and v:FindFirstChild("TouchInterest") then
-                    v.TouchInterest:Destroy()
-                end
-            end
-        end
-    end
-end)
-
-task.spawn(function()
-    while task.wait(0.2) do
-        if getgenv().RGD_SolidWater then
-            for _, v in pairs(workspace:GetDescendants()) do
-                if v.Name == "Water" then
-                    v.CanCollide = true
-                    v.Transparency = 0
-                end
-            end
-        end
-    end
-end)
-
-task.spawn(function()
-    while task.wait(0.2) do
-        if getgenv().RGD_SolidLava then
-            for _, v in pairs(workspace:GetDescendants()) do
-                if v.Name == "Lava" then
-                    v.CanCollide = true
-                    v.BrickColor = BrickColor.new("Cocoa")
-                    v.Transparency = 0
-                end
-            end
-        end
-    end
-end)
-
-task.spawn(function()
-    while task.wait(0.2) do
-        if getgenv().RGD_PressButtons then
-            for _, v in pairs(workspace.Room.Enemies:GetDescendants()) do
-                if v.Name == "Button" and v:FindFirstChild("ClickDetector") then
-                    fireclickdetector(v.ClickDetector)
-                end
-            end
-        end
-    end
-end)
-
-task.spawn(function()
-    while task.wait(0.2) do
-        if getgenv().RGD_BringGroundItems then
-            local char = LocalPlayer.Character
-            local hrp  = char and char:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                for _, v in pairs(workspace:GetDescendants()) do
-                    if v:IsA("Tool") and v:FindFirstChild("Handle") then
-                        v.Handle.CFrame = hrp.CFrame
-                        v.Handle.CanCollide = false
+            local room    = workspace:FindFirstChild("Room")
+            local enemies = room and room:FindFirstChild("Enemies")
+            if enemies then
+                for _, v in pairs(enemies:GetDescendants()) do
+                    if v:IsA("Part") and v.Name == "Head" then
+                        v.Anchored = false
                     end
                 end
             end
@@ -192,364 +390,29 @@ task.spawn(function()
     end
 end)
 
--- loop hitbox enemigos
-local function getEnemiesFolder()
-    local room = workspace:FindFirstChild("Room")
-    if not room then return nil end
-    return room:FindFirstChild("Enemies")
-end
-
-local function applyEnemyHitbox(sizeVal, transparency)
-    local enemiesFolder = getEnemiesFolder()
-    if not enemiesFolder then return end
-
-    for _, enemy in ipairs(enemiesFolder:GetChildren()) do
-        if enemy:IsA("Model") then
-            local root = enemy:FindFirstChild("HumanoidRootPart")
-                       or enemy:FindFirstChild("Head")
-                       or enemy.PrimaryPart
-                       or enemy:FindFirstChildWhichIsA("BasePart", true)
-            if root and root:IsA("BasePart") then
-                if not originalEnemyData[root] then
-                    originalEnemyData[root] = {
-                        Size         = root.Size,
-                        Transparency = root.Transparency,
-                        CanCollide   = root.CanCollide,
-                        Massless     = root.Massless
-                    }
-                end
-
-                root.CanCollide = false
-                root.Massless   = true
-
-                if not sizeVal or sizeVal == 1 then
-                    root.Size = Vector3.new(2, 1, 1)
-                else
-                    root.Size = Vector3.new(sizeVal, sizeVal, sizeVal)
-                end
-
-                root.Transparency = transparency
-            end
-        end
-    end
-end
-
-local function restoreEnemyHitbox()
-    for part, data in pairs(originalEnemyData) do
-        if part and part.Parent then
-            part.Size         = data.Size
-            part.Transparency = data.Transparency
-            part.CanCollide   = data.CanCollide
-            part.Massless     = data.Massless
-        end
-    end
-    originalEnemyData = {}
-end
-
 task.spawn(function()
-    while task.wait(0.2) do
-        if getgenv().HK6_Enabled then
-            applyEnemyHitbox(getgenv().HK6_Size, getgenv().HK6_Transp)
+    while task.wait(0.1) do
+        if getgenv().RGD_BringOrnaments then
+            local char = getCharacter()
+            local hrp  = char:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                for _, orn in ipairs(workspace:GetChildren()) do
+                    if orn:IsA("Model") and orn.Name == "Ornament" then
+                        local handle = orn:FindFirstChild("Handle")
+                        if handle and handle:IsA("BasePart") then
+                            handle.CFrame = hrp.CFrame
+                            handle.CanCollide = false
+                        end
+                    end
+                end
+            end
         end
     end
 end)
 
---================= SECCIONES UI =================
-
-local DroidMenu = MainMenu:AddSection({
-    Position = "left",
-    Name = "Droids / Circuits"
+Rayfield:Notify({
+    Title = "✓ Cargado",
+    Content = "Hub iniciado con Principal + Config + Loops + TPs.",
+    Duration = 3,
+    Image = 4483362458,
 })
-
-local PuzzleMenu = MainMenu:AddSection({
-    Position = "right",
-    Name = "Puzzle Boxes"
-})
-
-local MapMenu = MainMenu:AddSection({
-    Position = "left",
-    Name = "Map"
-})
-
-local PlayerMenu = MainMenu:AddSection({
-    Position = "right",
-    Name = "Player"
-})
-
---========== DROID / CIRCUITS (incluye hitbox) ==========
-
-DroidMenu:AddToggle({
-    Name = "Kill all Droids",
-    Default = false,
-    Callback = function(v)
-        getgenv().RGD_KillAllDroids = v
-    end
-})
-
-DroidMenu:AddToggle({
-    Name = "Bring all Circuits",
-    Default = false,
-    Callback = function(v)
-        getgenv().RGD_BringCircuits = v
-    end
-})
-
-DroidMenu:AddToggle({
-    Name = "Anchor all Droids",
-    Default = false,
-    Callback = function(v)
-        getgenv().RGD_AnchorDroids = v
-        if v then
-            getgenv().RGD_UnAnchorDroids = false
-        end
-    end
-})
-
-DroidMenu:AddToggle({
-    Name = "Un-Anchor all Droids",
-    Default = false,
-    Callback = function(v)
-        getgenv().RGD_UnAnchorDroids = v
-        if v then
-            getgenv().RGD_AnchorDroids = false
-        end
-    end
-})
-
-DroidMenu:AddToggle({
-    Name = "Auto Room (???)",
-    Default = false,
-    Callback = function(v)
-        getgenv().RGD_AutoRoom = v
-    end
-})
-
--- HITBOX ENEMIES
-
-DroidMenu:AddToggle({
-    Name = "Enemy HitboxK6 )buggy)",
-    Default = false,
-    Callback = function(v)
-        getgenv().HK6_Enabled = v
-        if not v then
-            restoreEnemyHitbox()
-        end
-    end
-})
-
-DroidMenu:AddSlider({
-    Name = "Hitbox Size",
-    Min = 1,
-    Max = 30,
-    Default = 10,
-    Callback = function(val)
-        getgenv().HK6_Size = val
-    end
-})
-
-DroidMenu:AddSlider({
-    Name = "Hitbox Transparency",
-    Min = 0,
-    Max = 1,
-    Default = 0.4,
-    Callback = function(val)
-        getgenv().HK6_Transp = val
-    end
-})
-
---================= PUZZLE BOXES =================
-
-PuzzleMenu:AddButton({
-    Name = "Solve Puzzles Red",
-    Callback = function()
-        for _, v in pairs(workspace.Room.Enemies:GetDescendants()) do
-            if v.Name == "PuzzleBox 1" then
-                v.Box.CFrame = workspace.Room.Enemies["PressurePlate 1"].Activator.CFrame
-            end
-        end
-    end
-})
-
-PuzzleMenu:AddButton({
-    Name = "Solve Puzzles Blue",
-    Callback = function()
-        for _, v in pairs(workspace.Room.Enemies:GetDescendants()) do
-            if v.Name == "PuzzleBox 2" then
-                v.Box.CFrame = workspace.Room.Enemies["PressurePlate 2"].Activator.CFrame
-            end
-        end
-    end
-})
-
-PuzzleMenu:AddButton({
-    Name = "Solve Puzzles Green",
-    Callback = function()
-        for _, v in pairs(workspace.Room.Enemies:GetDescendants()) do
-            if v.Name == "PuzzleBox 3" then
-                v.Box.CFrame = workspace.Room.Enemies["PressurePlate 3"].Activator.CFrame
-            end
-        end
-    end
-})
-
---================= MAP =================
-
-MapMenu:AddToggle({
-    Name = "Lava Immunity",
-    Default = false,
-    Callback = function(v)
-        getgenv().RGD_LavaImmunity = v
-    end
-})
-
-MapMenu:AddToggle({
-    Name = "Water+QuickSand Immunity",
-    Default = false,
-    Callback = function(v)
-        getgenv().RGD_WaterQuicksandImm = v
-    end
-})
-
-MapMenu:AddToggle({
-    Name = "Acid Immunity",
-    Default = false,
-    Callback = function(v)
-        getgenv().RGD_AcidImmunity = v
-    end
-})
-
-MapMenu:AddToggle({
-    Name = "Solidify Water",
-    Default = false,
-    Callback = function(v)
-        getgenv().RGD_SolidWater = v
-    end
-})
-
-MapMenu:AddToggle({
-    Name = "Solidify Lava",
-    Default = false,
-    Callback = function(v)
-        getgenv().RGD_SolidLava = v
-    end
-})
-
-MapMenu:AddToggle({
-    Name = "Press all Buttons",
-    Default = false,
-    Callback = function(v)
-        getgenv().RGD_PressButtons = v
-    end
-})
-
-MapMenu:AddToggle({
-    Name = "Bring all Items on Ground (bug)",
-    Default = false,
-    Callback = function(v)
-        getgenv().RGD_BringGroundItems = v
-    end
-})
-
---================= PLAYER =================
-
-PlayerMenu:AddSlider({
-    Name = "WalkSpeed",
-    Min = 0,
-    Max = 100,
-    Default = 50,
-    Callback = function(t)
-        local char = LocalPlayer.Character
-        local hum  = char and char:FindFirstChildOfClass("Humanoid")
-        if hum then hum.WalkSpeed = t end
-    end
-})
-
-PlayerMenu:AddSlider({
-    Name = "JumpPower",
-    Min = 0,
-    Max = 300,
-    Default = 50,
-    Callback = function(t)
-        local char = LocalPlayer.Character
-        local hum  = char and char:FindFirstChildOfClass("Humanoid")
-        if hum then hum.JumpPower = t end
-    end
-})
-
-PlayerMenu:AddTextbox({
-    Name = "Manual WalkSpeed",
-    Default = "",
-    PlaceholderText = "Type here!",
-    Numeric = true,
-    Callback = function(t)
-        local val = tonumber(t)
-        if not val then return end
-        local char = LocalPlayer.Character
-        local hum  = char and char:FindFirstChildOfClass("Humanoid")
-        if hum then hum.WalkSpeed = val end
-    end
-})
-
-PlayerMenu:AddTextbox({
-    Name = "Manual JumpPower",
-    Default = "",
-    PlaceholderText = "Type here!",
-    Numeric = true,
-    Callback = function(t)
-        local val = tonumber(t)
-        if not val then return end
-        local char = LocalPlayer.Character
-        local hum  = char and char:FindFirstChildOfClass("Humanoid")
-        if hum then hum.JumpPower = val end
-    end
-})
-
-PlayerMenu:AddButton({
-    Name = "HitBox+ (buggy)",
-    Callback = function()
-        local lp = Players.LocalPlayer
-        local bp = lp and lp.Backpack
-        if not bp then return end
-
-        -- primer tool con Handle en la backpack
-        local tool
-        for _, v in ipairs(bp:GetChildren()) do
-            if v:IsA("Tool") and v:FindFirstChild("Handle") then
-                tool = v
-                break
-            end
-        end
-
-        if tool then
-            tool.Handle.Size = Vector3.new(60, 60, 60)
-        end
-    end
-})
-
-PlayerMenu:AddButton({
-    Name = "Undo HitBox+",
-    Callback = function()
-        local lp = Players.LocalPlayer
-        local bp = lp and lp.Backpack
-        if not bp then return end
-
-        local tool
-        for _, v in ipairs(bp:GetChildren()) do
-            if v:IsA("Tool") and v:FindFirstChild("Handle") then
-                tool = v
-                break
-            end
-        end
-
-        if tool then
-            tool.Handle.Size = Vector3.new(1, 0.8, 5)
-        end
-    end
-})
-
-
-PlayerMenu:AddLabel({
-    Text = "You must have the Copper Sword unequipped."
-})
-
-end)
