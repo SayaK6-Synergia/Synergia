@@ -413,6 +413,6 @@ end)
 Rayfield:Notify({
     Title = "✓ Cargado",
     Content = "Hub iniciado con Principal + Config + Loops + TPs.",
-    Duration = 3,
+    Duration = 300,
     Image = 4483362458,
 })
